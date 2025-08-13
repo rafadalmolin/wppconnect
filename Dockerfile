@@ -1,21 +1,29 @@
-FROM node:18-alpine
+# Etapa 1: Build
+FROM node:18-slim AS build
 
-# Diretório de trabalho
-WORKDIR /app
+WORKDIR /usr/src/app
 
-# Copiar arquivos para dentro da imagem
+# Adiciona dependências nativas necessárias
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+COPY package.json yarn.lock ./
+RUN yarn install --production --ignore-engines
+
+# Copia os arquivos da aplicação
 COPY . .
 
-# Instalar dependências e evitar problemas com engines
-RUN yarn install --production --ignore-engines && yarn add sharp && yarn cache clean
-
-# Compilar o TypeScript
+# Compila o TypeScript
 RUN yarn build
 
-# Expor a porta padrão do servidor
+# Etapa 2: Runtime
+FROM node:18-slim
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app /usr/src/app
+
 EXPOSE 21465
 
-# Comando para rodar o servidor
 CMD ["node", "dist/index.js"]
 
 
