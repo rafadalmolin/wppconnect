@@ -1,29 +1,19 @@
-FROM node:18-slim
+# Etapa base
+FROM node:18-alpine
 
-# Instala dependências do sistema para o sharp funcionar
-RUN apt-get update && apt-get install -y \
-  build-essential \
-  libcairo2-dev \
-  libjpeg-dev \
-  libpango1.0-dev \
-  libgif-dev \
-  librsvg2-dev \
-  libvips-dev \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
+# Diretório de trabalho no container
 WORKDIR /usr/src/app
 
-COPY package.json ./
-
-# Agora sim, instala as libs
-RUN yarn install --production
-
-# Adiciona sharp após dependências do sistema estarem ok
-RUN yarn add sharp --ignore-engines && yarn cache clean
-
+# Copia os arquivos para o container
 COPY . .
 
+# Instala dependências (ignora engines e lida com o sharp)
+RUN yarn install --production --ignore-engines \
+ && yarn add sharp --ignore-engines \
+ && yarn cache clean
+
+# Expõe a porta usada pelo servidor
 EXPOSE 21465
 
+# Comando de inicialização
 CMD ["yarn", "start"]
