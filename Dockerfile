@@ -21,21 +21,26 @@ COPY yarn.lock* . 2>/dev/null || true
 COPY pnpm-lock.yaml* . 2>/dev/null || true
 
 # instala conforme lock encontrado
-RUN set -eux; \
+RUN /bin/sh -lc '\
+  set -eux; \
   if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
   elif [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci --omit=dev=false; \
-  else npm install; fi
+  else npm install; fi'
 
 # copia o resto do código
 COPY . .
 
 # compila se houver script build
-RUN node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts.build?0:1)" \
-  && ( if [ -f yarn.lock ]; then yarn build; \
-       elif [ -f pnpm-lock.yaml ]; then pnpm build; \
-       else npm run build; fi ) \
-  || echo '>> Sem script "build"; seguiremos sem transpilação'
+RUN /bin/sh -lc '\
+  if node -e "const p=require(\"./package.json\");process.exit(p.scripts&&p.scripts.build?0:1)"; then \
+    echo ">> build"; \
+    if [ -f yarn.lock ]; then yarn build; \
+    elif [ -f pnpm-lock.yaml ]; then pnpm build; \
+    else npm run build; fi; \
+  else \
+    echo ">> sem script build"; \
+  fi'
 
 # ---------- Runtime ----------
 FROM node:20-bookworm-slim AS runtime
@@ -57,26 +62,8 @@ COPY --from=build /app/dist ./dist 2>/dev/null || true
 COPY --from=build /app/src ./src
 COPY --from=build /app/package.json ./package.json
 
-# entrypoint flexível (prioriza scripts do package.json)
-COPY <<'EOF' /app/docker-entrypoint.sh
-#!/usr/bin/env bash
-set -euo pipefail
-has_script () { node -e "const p=require('./package.json');process.exit(p.scripts&&p.scripts['$1']?0:1)"; }
-
-if has_script start:prod; then
-  exec dumb-init npm run start:prod
-elif has_script start; then
-  exec dumb-init npm start
-elif [ -f dist/index.js ]; then
-  exec dumb-init node dist/index.js
-elif [ -f src/index.ts ] && npx --yes tsx --version >/dev/null 2>&1; then
-  exec dumb-init npx tsx src/index.ts
-elif [ -f index.js ]; then
-  exec dumb-init node index.js
-else
-  echo "Não encontrei como iniciar. Ajuste scripts ou arquivo de entrada."; ls -la; exit 1
-fi
-EOF
+# copia o entrypoint (arquivo separado no repo)
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 21465
