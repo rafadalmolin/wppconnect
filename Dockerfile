@@ -18,3 +18,4 @@ EXPOSE 21465
 # Comando para rodar o servidor
 CMD ["node", "dist/index.js"]
 
+
