@@ -18,4 +18,4 @@ ENV NODE_ENV=production \
     STORE_SESSION=true
 
 EXPOSE 21465
-CMD ["npm","start"]
+CMD ["npx","tsx","src/index.ts"]
