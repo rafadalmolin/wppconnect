@@ -1,19 +1,20 @@
-# Etapa base
 FROM node:18-alpine
 
-# Diretório de trabalho no container
-WORKDIR /usr/src/app
+# Diretório de trabalho
+WORKDIR /app
 
-# Copia os arquivos para o container
+# Copiar arquivos para dentro da imagem
 COPY . .
 
-# Instala dependências (ignora engines e lida com o sharp)
-RUN yarn install --production --ignore-engines \
- && yarn add sharp --ignore-engines \
- && yarn cache clean
+# Instalar dependências e evitar problemas com engines
+RUN yarn install --production --ignore-engines && yarn add sharp && yarn cache clean
 
-# Expõe a porta usada pelo servidor
+# Compilar o TypeScript
+RUN yarn build
+
+# Expor a porta padrão do servidor
 EXPOSE 21465
 
-# Comando de inicialização
-CMD ["yarn", "start"]
+# Comando para rodar o servidor
+CMD ["node", "dist/index.js"]
+
