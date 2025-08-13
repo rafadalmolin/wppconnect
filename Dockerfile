@@ -17,7 +17,7 @@ WORKDIR /usr/src/app
 COPY package.json ./
 
 # Agora sim, instala as libs
-RUN yarn install --production --pure-lockfile
+RUN yarn install --production
 
 # Adiciona sharp após dependências do sistema estarem ok
 RUN yarn add sharp --ignore-engines && yarn cache clean
