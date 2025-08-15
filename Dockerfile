@@ -1,77 +1,48 @@
-# Multi-stage build para otimizar o tamanho final
-FROM node:20-alpine AS base
+FROM node:20
 
-# Instalar dependências necessárias para Puppeteer
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    freetype-dev \
-    harfbuzz \
+# Instalar dependências do sistema para Puppeteer
+RUN apt-get update && apt-get install -y \
+    wget \
     ca-certificates \
-    ttf-freefont \
-    curl \
-    && rm -rf /var/cache/apk/*
-
-# Configurar Puppeteer para usar Chromium do sistema
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgdk-pixbuf2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copiar package.json e yarn.lock/package-lock.json se existir
+# Copiar e instalar dependências
 COPY package*.json ./
-COPY yarn.lock* ./
+RUN npm install
 
-# Instalar dependências
-RUN if [ -f yarn.lock ]; then \
-    yarn install --production --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then \
-    npm ci --only=production; \
-    else \
-    npm install --production; \
-    fi
-
-# Instalar tsx globalmente para executar TypeScript
+# Instalar tsx globalmente
 RUN npm install -g tsx
-
-# Stage para desenvolvimento (com devDependencies)
-FROM base AS dev
-RUN if [ -f yarn.lock ]; then \
-    yarn install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then \
-    npm ci; \
-    else \
-    npm install; \
-    fi
-
-# Stage de produção
-FROM base AS production
 
 # Copiar código fonte
 COPY . .
 
 # Criar diretório para tokens
-RUN mkdir -p /tokens && chmod 755 /tokens
+RUN mkdir -p /tokens
 
-# Configurar variáveis de ambiente
+# Variáveis de ambiente
 ENV NODE_ENV=production \
     PORT=21465 \
     SESSIONS_DIR=/tokens \
-    STORE_SESSION=true
+    STORE_SESSION=true \
+    PUPPETEER_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
 
-# Expor porta
 EXPOSE 21465
 
-# Criar usuário não-root para segurança
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S wppconnect -u 1001 -G nodejs
-
-# Alterar proprietário dos arquivos
-RUN chown -R wppconnect:nodejs /app /tokens
-
-# Mudar para usuário não-root
-USER wppconnect
-
-# Comando para iniciar a aplicação
 CMD ["tsx", "src/index.ts"]
