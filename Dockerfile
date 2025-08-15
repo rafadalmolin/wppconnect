@@ -1,6 +1,6 @@
 FROM node:20
 
-# Instalar dependências do sistema
+# Instalar dependências do sistema para Puppeteer
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -19,26 +19,30 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     lsb-release \
     xdg-utils \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Clonar o repositório diretamente
-RUN git clone https://github.com/rafadalmolin/wppconnect.git . && \
-    echo "=== Arquivos clonados ===" && \
+# Copiar tudo primeiro
+COPY . .
+
+# Debug e instalação das dependências
+RUN echo "=== Estrutura do projeto ===" && \
     ls -la && \
     echo "=== Verificando package.json ===" && \
     if [ -f package.json ]; then \
+        echo "package.json encontrado:" && \
         cat package.json; \
     else \
-        echo "package.json não encontrado!"; \
+        echo "ERRO: package.json não encontrado!"; \
+        echo "Arquivos disponíveis:"; \
+        find . -name "*.json" | head -10; \
         exit 1; \
-    fi
-
-# Instalar dependências
-RUN npm cache clean --force && \
-    npm install
+    fi && \
+    echo "=== Limpando cache npm ===" && \
+    npm cache clean --force && \
+    echo "=== Instalando dependências ===" && \
+    npm install --verbose
 
 # Instalar tsx globalmente
 RUN npm install -g tsx
@@ -55,31 +59,29 @@ ENV NODE_ENV=production \
 
 EXPOSE 21465
 
-# Verificar se o arquivo de entrada existe
-RUN if [ -f src/index.ts ]; then \
-        echo "Arquivo src/index.ts encontrado"; \
+# Verificar arquivo de entrada e definir comando
+RUN echo "=== Verificando arquivos de entrada ===" && \
+    if [ -f src/index.ts ]; then \
+        echo "Encontrado: src/index.ts" && \
+        echo 'tsx src/index.ts' > /start.sh; \
     elif [ -f index.ts ]; then \
-        echo "Arquivo index.ts encontrado no root"; \
+        echo "Encontrado: index.ts" && \
+        echo 'tsx index.ts' > /start.sh; \
     elif [ -f src/index.js ]; then \
-        echo "Arquivo src/index.js encontrado"; \
+        echo "Encontrado: src/index.js" && \
+        echo 'node src/index.js' > /start.sh; \
     elif [ -f index.js ]; then \
-        echo "Arquivo index.js encontrado no root"; \
+        echo "Encontrado: index.js" && \
+        echo 'node index.js' > /start.sh; \
+    elif [ -f package.json ] && grep -q '"start"' package.json; then \
+        echo "Usando npm start do package.json" && \
+        echo 'npm start' > /start.sh; \
     else \
-        echo "Nenhum arquivo de entrada encontrado!"; \
-        echo "Estrutura do projeto:"; \
+        echo "ERRO: Nenhum ponto de entrada encontrado!"; \
+        echo "Arquivos TypeScript/JavaScript disponíveis:"; \
         find . -name "*.ts" -o -name "*.js" | head -20; \
         exit 1; \
-    fi
+    fi && \
+    chmod +x /start.sh
 
-# Comando flexível - vai tentar diferentes pontos de entrada
-CMD if [ -f src/index.ts ]; then \
-        tsx src/index.ts; \
-    elif [ -f index.ts ]; then \
-        tsx index.ts; \
-    elif [ -f src/index.js ]; then \
-        node src/index.js; \
-    elif [ -f index.js ]; then \
-        node index.js; \
-    else \
-        npm start; \
-    fi
+CMD ["/bin/bash", "/start.sh"]
