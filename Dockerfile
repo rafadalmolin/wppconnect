@@ -84,4 +84,8 @@ RUN echo "=== Verificando arquivos de entrada ===" && \
     fi && \
     chmod +x /start.sh
 
-CMD ["/bin/bash", "/start.sh"]
+CMD echo "=== INICIANDO APLICAÇÃO ===" && \
+    echo "Comando que será executado:" && \
+    cat /start.sh && \
+    echo "=== EXECUTANDO ===" && \
+    /bin/bash /start.sh || (echo "=== ERRO NA EXECUÇÃO ===" && tail -f /dev/null)
